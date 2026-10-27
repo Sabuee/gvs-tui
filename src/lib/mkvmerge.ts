@@ -51,6 +51,14 @@ function run(bin: string, args: string[], phase?: Phase, signal?: AbortSignal): 
   return promise
 }
 
+/** Track name for a Chinese script. cmn-Hans / cmn-Hant / yue-Hant are not languages mkvmerge keeps. */
+export function subtitleTrackName(lang: string): string {
+  const tag = lang.trim().toLowerCase().replace(/_/g, '-')
+  if (/(?:^|-)hant(?:-|$)/.test(tag) || /-(?:tw|hk|mo)$/.test(tag)) return '繁体中文'
+  if (/(?:^|-)hans(?:-|$)/.test(tag) || tag === 'chs' || /-(?:cn|sg)$/.test(tag)) return '简体中文'
+  return ''
+}
+
 /** Display names from 优酷 → ISO 639-2 for mkvmerge `--language`. */
 export function mkvLang(lang: string): string {
   const s = lang.trim().toLowerCase()
@@ -274,13 +282,13 @@ export async function mkvmergeTrackFiles(bin: string, inputs: string[], out: str
       } else if (match && isUnknownAudioLanguage(language)) args.push('--language',`${track.id}:${mkvLang(match[1]!)}`)
       if (track.type==='subtitles') {
         args.push('--default-track',`${track.id}:no`)
-        // RE names the file from LANGUAGE. zh-Hans is not a language mkvmerge
-        // keeps on a text subtitle, so the merged track stays und.
-        const raw = match?.[1] || ''
-        const parts = raw.toLowerCase().split('-')
-        const scripted = /^(?:cmn|yue|zh|zho|chi)$/.test(parts[0] || '') && /^(?:hans|hant|cn|sg|tw|hk|mo)$/.test(parts[1] || '')
-        const tagged = scripted ? raw : mkvLang(raw)
+        // Apple tags Chinese as cmn-Hans / cmn-Hant / yue-Hant. mkvmerge stores
+        // those as und, so map them to chi and keep the script in the track name.
+        const raw = (match?.[1] || language).replace(/_/g, '-')
+        const remark = subtitleTrackName(raw)
+        const tagged = remark ? 'chi' : mkvLang(raw)
         if (tagged && tagged !== 'und') args.push('--language',`${track.id}:${tagged}`)
+        if (remark) args.push('--track-name', `${track.id}:${remark}`)
       }
       if (track.type==='audio') {
         args.push('--default-track',`${track.id}:${firstAudio?'yes':'no'}`)
