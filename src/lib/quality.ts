@@ -469,11 +469,23 @@ export function tencentFormatHDR(raw: Record<string, unknown>): string {
 }
 
 /** Display the confirmed subtitle mode, falling back to the catalog's requested mode. */
-export function qualityCaptionText(caption?: string, captionProbe?: string): string {
-  if (caption === 'soft') return '软字幕'
-  if (caption === 'hard') return '硬字幕'
-  if (captionProbe === 'soft') return '软字幕'
-  if (captionProbe === 'hard') return '硬字幕'
+/**
+ * 画质表「字幕」列：只认网关回传的**已证实**字幕类型（`caption`）。
+ *
+ * `caption_probe` 只是「用哪种 persona 探的」——探测请求默认就是 soft，几乎所有行都会带上
+ * `caption_probe=soft`。把它当字幕依据会让整张画质表全标「软字幕」（2026-10-28 实测：
+ * 兰香如故 ep37 有 sfl，只有实际下发的那一行 `caption=soft`；嫁金钗等硬字幕片源一行都没有）。
+ * 因此第二个参数保留只为兼容旧调用，不参与判断。
+ */
+export function qualityCaptionText(caption?: string, captionProbe?: string, probeMixed = false): string {
+  if (caption === 'soft' || caption === '软') return '软字幕'
+  if (caption === 'hard' || caption === '硬') return '硬字幕'
+  // 只有同一份目录里同时存在软/硬两种探测档时，caption_probe 才是有区分度的信息
+  // （腾讯按软/硬各出一套 rendition）。单一探测档默认就是 soft，显示出来会让整张表全标「软字幕」。
+  if (probeMixed) {
+    if (captionProbe === 'soft' || captionProbe === '软') return '软字幕'
+    if (captionProbe === 'hard' || captionProbe === '硬') return '硬字幕'
+  }
   return ''
 }
 
@@ -499,11 +511,11 @@ export function qualityFpsText(fps?: number): string {
 }
 
 /** 确认页和状态行：档位名后面带上动态范围、帧率和软硬字幕。名字里已经写了的不再重复。 */
-export function qualityChoiceLabel(q: Pick<Quality, 'label' | 'title' | 'caption' | 'captionProbe' | 'hdr' | 'fps'>): string {
+export function qualityChoiceLabel(q: Pick<Quality, 'label' | 'title' | 'caption' | 'captionProbe' | 'captionProbeMixed' | 'hdr' | 'fps'>): string {
   const base = (q.label || q.title || '').trim()
   const hdr = qualityHdrText(q.hdr)
   const fps = qualityFpsText(q.fps)
-  const cap = qualityCaptionText(q.caption, q.captionProbe)
+  const cap = qualityCaptionText(q.caption, q.captionProbe, q.captionProbeMixed)
   const parts = [base]
   if (hdr && !base.toUpperCase().includes(hdr.toUpperCase())) parts.push(hdr)
   if (fps && !base.toLowerCase().includes(fps.toLowerCase())) parts.push(fps)
@@ -615,6 +627,10 @@ export function qualitiesFromTencentFormats(formats: unknown): Quality[] {
       encodeTag: encodeTag || undefined,
     })
   }
+  // caption_probe 只有在软/硬两种档位同时出现时才有区分度；单一探测档（默认 soft）
+  // 不能当作「这档有软字幕」的证据，否则整张画质表会被标成全软字幕。
+  const probes = new Set(out.map(q => q.captionProbe).filter((p): p is 'soft' | 'hard' => !!p))
+  if (probes.size > 1) for (const q of out) q.captionProbeMixed = true
   return sortTencentQualities(out)
 }
 
