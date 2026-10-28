@@ -60,5 +60,7 @@ export function tencentSelectedPlayInput(q: TencentQualityChoice): Record<string
 export function tencentDownloadSelection(q: TencentQualityChoice): { stream: string; caption?: string; formatId?: string } {
   const selection = tencentChoiceSelection(q)
   const input = tencentSelectedPlayInput(q)
-  return { stream: input.defn, caption: input.caption, formatId: selection.formatId }
+  // Compare only a caption the catalog actually confirmed. A probe-only row has none.
+  const caption = tencentCaption(q.caption || '')
+  return { stream: input.defn, ...(caption === 'soft' || caption === 'hard' ? { caption } : {}), formatId: selection.formatId }
 }

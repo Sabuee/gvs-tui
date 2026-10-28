@@ -2,7 +2,7 @@ import { expect, test } from 'bun:test'
 import { selectedTencentQuality, tencentDownloadSelection, tencentSelectedPlayInput } from './tencent-quality-selection.ts'
 import type { Quality } from '../types.ts'
 import { qualitiesFromTencentFormats, qualityCaptionText, qualityChoiceLabel } from './quality.ts'
-import { pickTencentDownloadURL } from './media.ts'
+import { pickTencentDownload, pickTencentDownloadURL } from './media.ts'
 
 test('probe rows keep the soft probe for selection but never as subtitle evidence', () => {
   const [quality] = qualitiesFromTencentFormats([{ name: 'fhd', id: '3', caption_probe: '软' }])
@@ -18,6 +18,15 @@ test('probe rows keep the soft probe for selection but never as subtitle evidenc
     { name: 'fhd', id: '3', caption_probe: '硬', url: 'https://example.invalid/hard' },
     { name: 'fhd', id: '3', caption_probe: '软', url: 'https://example.invalid/soft' },
   ] }, { stream: 'fhd', formatId: '3', caption: 'soft' })).toBe('https://example.invalid/soft')
+})
+
+test('a probe-only selection does not fail when the delivered caption is unconfirmed', () => {
+  const [quality] = qualitiesFromTencentFormats([{ name: 'fhd', id: '3', caption_probe: '软' }])
+  const task = { quality: quality!.stream, tencentQuality: selectedTencentQuality(quality!) }
+  expect(tencentDownloadSelection(task).caption).toBeUndefined()
+  const played = { video: { url: 'https://cdn.example/default.m3u8', format_id: '3', defn: 'fhd' } }
+  const picked = pickTencentDownload(played, tencentDownloadSelection(task))
+  expect(picked.version.matchesSelection).not.toBe('different')
 })
 
 test('unconfirmed soft and hard catalog rows have distinct labels and retain exact download selectors', () => {
