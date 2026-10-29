@@ -18,7 +18,8 @@ export function equivalentTencentRendition(choice: TencentQualityChoice & { code
   const input = tencentDownloadSelection(choice)
   const codec = codecKey(choice.codec || '')
   const hdr = selected.hdr?.trim().toLowerCase()
-  if (!Array.isArray(formats) || !selected.formatId || !selected.persona || !input.caption ||
+  const requestedCaption = tencentCaption(selected.captionProbe || input.caption || '')
+  if (!Array.isArray(formats) || !selected.formatId || !selected.persona || !requestedCaption ||
     !selected.width || !selected.height || !selected.fps || !hdr || !codec) return undefined
   const rows = formats.filter(isObj).flatMap(raw => {
     const q = qualitiesFromTencentFormats([raw])[0]
@@ -32,8 +33,8 @@ export function equivalentTencentRendition(choice: TencentQualityChoice & { code
     return !!q.formatId && q.stream?.toLowerCase() === input.stream.toLowerCase()
       && tencentPersonaKey(q.persona || '').toLowerCase() === tencentPersonaKey(selected.persona!).toLowerCase()
       && (!selected.group || q.group === selected.group)
-      && tencentCaption(q.captionProbe || q.caption || '') === input.caption
-      && (!q.caption || tencentCaption(q.caption) === input.caption)
+      && tencentCaption(q.captionProbe || q.caption || '') === requestedCaption
+      && (!q.caption || tencentCaption(q.caption) === requestedCaption)
       && Math.abs(Math.max(q.width, q.height) - Math.max(selected.width!, selected.height!)) <= 16
       && Math.abs(Math.min(q.width, q.height) - Math.min(selected.width!, selected.height!)) <= 16
       && !!q.fps && Math.abs(q.fps - selected.fps!) < 0.1
